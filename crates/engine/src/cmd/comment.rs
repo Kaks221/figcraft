@@ -385,12 +385,15 @@ const PROMPT_MAX_MENTIONS: usize = 32;
 fn people_and_mentioned(doc: &Document, you: &str) -> Vec<String> {
     let people = doc.comment_people();
     let resolve = mentionable(&people, you);
-    let mut out = people.clone();
-    for m in doc.comments.iter().flat_map(Comment::messages) {
-        for (name, _) in mentioned(&m.text, &resolve) {
-            if !out.iter().any(|p| p.eq_ignore_ascii_case(name)) {
-                out.push(name.to_string());
-            }
+    let mut seen = std::collections::HashSet::new();
+    let mut out: Vec<String> = Vec::new();
+    let names = people
+        .iter()
+        .map(String::as_str)
+        .chain(doc.comments.iter().flat_map(Comment::messages).flat_map(|m| mentioned(&m.text, &resolve).map(|(n, _)| n)));
+    for name in names {
+        if seen.insert(name.to_lowercase()) {
+            out.push(name.to_string());
         }
     }
     out.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()).then_with(|| a.cmp(b)));

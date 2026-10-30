@@ -91,6 +91,15 @@ fn people_lists_the_names_only_mentioned_too() {
 }
 
 #[test]
+fn people_who_write_in_two_cases_are_listed_once() {
+    let mut s = Session::new();
+    let id = add(&mut s, "Hi", "Ada");
+    s.execute("comment.reply", &json!({"id": id, "text": "Hi @ADA", "author": "ada"})).unwrap();
+    let p = s.execute("comment.people", &json!({})).unwrap();
+    assert_eq!(p["people"].as_array().map(Vec::len), Some(1), "{}", p["people"]);
+}
+
+#[test]
 fn next_and_prompt_carry_the_mentions_too() {
     let mut s = Session::new();
     let first = add(&mut s, "@Claude make this bigger", "Sam");
