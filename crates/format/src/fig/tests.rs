@@ -92,7 +92,7 @@ pub(super) fn f(x: f64) -> Kv<'static> {
 pub(super) fn u(x: u64) -> Kv<'static> {
     Kv::Uint(x)
 }
-fn e(n: &'static str) -> Kv<'static> {
+pub(super) fn e(n: &'static str) -> Kv<'static> {
     Kv::Enum(n)
 }
 pub(super) fn s(x: impl Into<String>) -> Kv<'static> {
