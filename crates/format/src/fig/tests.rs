@@ -59,7 +59,7 @@ message TextData string characters, uint[] characterStyleIDs, NodeChange[] style
 message Path WindingRule windingRule, uint commandsBlob
 message GUIDPath GUID[] guids
 message SymbolData GUID symbolID, NodeChange[] symbolOverrides
-message StyleId GUID guid
+message StyleId GUID guid, AssetRef assetRef
 message PropValue bool boolValue, TextData textValue
 message PropDef GUID id, string name, PropValue initialValue, PropType type
 message PropAssignment GUID defID, PropValue value

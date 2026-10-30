@@ -34,6 +34,8 @@ mod map;
 mod missing_image_tests;
 mod network;
 #[cfg(test)]
+mod paste_style_tests;
+#[cfg(test)]
 mod prop_value_tests;
 #[cfg(test)]
 mod slot_tests;
