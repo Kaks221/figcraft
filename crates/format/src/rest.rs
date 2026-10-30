@@ -1053,6 +1053,8 @@ impl<'a> Ctx<'a> {
 
     /// Cross-references that need every layer imported first.
     fn finish(&mut self) {
+        // A `.fig` import (its sources are taken below) noted each missing image already.
+        let fig = self.fig_sources.is_some();
         self.resolve_swap_defaults();
         // Variants share their set's property definitions.
         for (set, defs) in std::mem::take(&mut self.set_defs) {
@@ -1086,7 +1088,7 @@ impl<'a> Ctx<'a> {
                 flows.push(Flow { name, start: id, description: String::new() });
             }
         }
-        if self.missing_images > 0 && self.fig_sources.is_none() {
+        if self.missing_images > 0 && !fig {
             let n = self.missing_images;
             let (s, verb) = if n == 1 { ("", "shows") } else { ("s", "show") };
             self.warn(format!(
@@ -1472,7 +1474,7 @@ fn sane(p: &BezPath) -> bool {
 }
 
 /// Side of the placeholder image (large enough that scaling it up stays flat).
-const PLACEHOLDER_SIDE: u32 = 64;
+const PLACEHOLDER_SIDE: u32 = 256;
 
 /// The PNG standing in for image fills whose bytes aren't available (#1646): light grey crossed
 /// by darker diagonal stripes, so it reads as an image that is missing, not as a grey the design
@@ -1480,8 +1482,16 @@ const PLACEHOLDER_SIDE: u32 = 64;
 pub fn missing_image_placeholder() -> Option<&'static [u8]> {
     static PNG: std::sync::OnceLock<Option<Vec<u8>>> = std::sync::OnceLock::new();
     PNG.get_or_init(|| {
+        // Stripes 6 px wide every 18 px across the diagonal, their edges anti-aliased, so they
+        // stay clean when a fill scales the picture up.
+        let (period, width) = (18.0f32, 6.0f32);
+        let (ground, stripe) = ([0xE6u8, 0xE6, 0xE6], [0xB4u8, 0xB4, 0xB4]);
         let img = image::RgbaImage::from_fn(PLACEHOLDER_SIDE, PLACEHOLDER_SIDE, |x, y| {
-            if (x + y) % 16 < 5 { image::Rgba([0xB8, 0xB8, 0xB8, 0xFF]) } else { image::Rgba([0xE6, 0xE6, 0xE6, 0xFF]) }
+            let t = ((x + y) as f32 + 1.0) / std::f32::consts::SQRT_2 % period;
+            let inside = if t < width { t.min(width - t) + 0.5 } else { 0.5 - (t - width).min(period - t) };
+            let k = inside.clamp(0.0, 1.0);
+            let mix = |i: usize| (f32::from(ground[i]) + (f32::from(stripe[i]) - f32::from(ground[i])) * k).round() as u8;
+            image::Rgba([mix(0), mix(1), mix(2), 0xFF])
         });
         let mut out = Vec::new();
         img.write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png).ok()?;

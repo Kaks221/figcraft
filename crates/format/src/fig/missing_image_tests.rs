@@ -42,15 +42,18 @@ fn a_missing_image_keeps_its_name_and_shows_as_missing() {
     }
     let note = "image fills whose image isn't in the file show a missing-image placeholder and keep its name";
     assert_eq!(warnings.iter().filter(|w| w.starts_with(note)).count(), 1, "{warnings:?}");
+    assert!(!warnings.iter().any(|w| w.contains("without image data")), "the REST JSON note isn't given too: {warnings:?}");
 }
 
 #[test]
 fn the_placeholder_reads_as_missing_not_as_grey() {
     let png = image::load_from_memory(missing_image_placeholder().unwrap()).unwrap().to_rgba8();
-    let mut colours: Vec<[u8; 4]> = png.pixels().map(|p| p.0).collect();
-    colours.sort();
-    colours.dedup();
-    assert_eq!(colours.len(), 2, "two tones: stripes over a light ground, not one flat grey");
+    // Two tones (their anti-aliased edges between): darker stripes over a light ground, not one
+    // flat grey.
+    let count = |c: u8| png.pixels().filter(|p| p.0 == [c, c, c, 0xFF]).count();
+    let all = png.pixels().count();
+    let (ground, stripe) = (count(0xE6), count(0xB4));
+    assert!(ground > all / 2 && stripe > all / 8 && ground + stripe > all * 3 / 4, "{ground} ground, {stripe} stripe of {all}");
     // A real image of one colour is never taken for the placeholder.
     let flat = figcraft_doc::ImageData { bytes: std::sync::Arc::new(vec![1, 2, 3]), width: 64, height: 64 };
     assert!(!is_missing_image(&flat));
