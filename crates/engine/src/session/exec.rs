@@ -170,7 +170,9 @@ impl Session {
     }
 
     /// A layer's position and size stay finite: infinity and NaN are written as `null`, so a file
-    /// holding them saves but can't be reopened. Refuse such an edit (it is rolled back).
+    /// holding them saves but can't be reopened. Refuse such an edit (it is rolled back). Only the
+    /// layers the command added or changed are checked, so the cost follows the edit, not the
+    /// document (#1672).
     fn check_finite_geometry(&self, id: &str, before: &Option<(Arc<Document>, Vec<NodeId>, NodeId, u64)>) -> Result<()> {
         let Some((bdoc, _, _, uid)) = before else { return Ok(()) };
         let Some(ds) = self.docs.iter().find(|d| d.uid == *uid) else { return Ok(()) };
@@ -178,8 +180,11 @@ impl Session {
             return Ok(());
         }
         let broken = |n: &Node| !(n.transform.as_coeffs().iter().all(|c| c.is_finite()) && n.width.is_finite() && n.height.is_finite());
+        // The diff compares by value, and NaN never equals itself: a layer that was already broken
+        // and that the command left alone (the same `Arc`) can show up and isn't its doing.
         let untouched = |n: &Node| bdoc.node_arc(n.id).zip(ds.doc.node_arc(n.id)).is_some_and(|(a, b)| Arc::ptr_eq(a, b));
-        match ds.doc.nodes().find(|n| broken(n) && !untouched(n)) {
+        let changed = ds.doc.changed_ids(bdoc, usize::MAX).unwrap_or_default();
+        match changed.into_iter().filter_map(|i| ds.doc.node(i)).find(|n| broken(n) && !untouched(n)) {
             Some(n) => Err(bad(id, format!("\"{}\" would get a position or size beyond the number range", n.name))),
             None => Ok(()),
         }
